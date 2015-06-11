@@ -16,6 +16,7 @@
 
 package com.spotify.cassandra.extra;
 
+import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.Row;
 import com.datastax.driver.core.Session;
 import com.datastax.driver.core.Statement;
@@ -43,8 +44,8 @@ public class CassandraRuleTestManaged extends CassandraRuleTest {
 
   @Override
   public void queryRoundtrip() throws Exception {
-    ClusterConnection clusterConnection = getCassandraRule().getClusterConnection();
-    Session session = clusterConnection.getCluster().connect("mytable");
+    Cluster cluster = getCassandraRule().getCluster();
+    Session session = cluster.connect("mytable");
 
     final String key = "mykey";
     final ByteBuffer value = ByteBuffer.wrap(new byte[] {1, 2});

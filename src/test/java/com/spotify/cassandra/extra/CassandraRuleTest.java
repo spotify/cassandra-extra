@@ -34,15 +34,8 @@ public abstract class CassandraRuleTest {
   }
 
   @Test
-  public void shutdownAfterClusterConnectionClose() throws Throwable {
-    ClusterConnection clusterConnection = getCassandraRule().getClusterConnection();
-    clusterConnection.close();
-  }
-
-  @Test
   public void shutdownAfterClusterClose() throws Throwable {
-    ClusterConnection clusterConnection = getCassandraRule().getClusterConnection();
-    Cluster cluster = clusterConnection.getCluster();
+    Cluster cluster = getCassandraRule().getCluster();
     cluster.close();
   }
 

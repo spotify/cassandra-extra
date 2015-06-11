@@ -44,7 +44,6 @@ public class CassandraRuleTestUnmanaged extends CassandraRuleTest {
 
   @Override
   public void queryRoundtrip() throws Exception {
-
     Session session = cassandra.getSession();
 
     session.execute(KEYSPACE_SCHEMA);
