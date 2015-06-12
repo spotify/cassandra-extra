@@ -48,7 +48,6 @@ import static org.mockito.Mockito.when;
  * Providing a table schema causes this rule to create the table during @Before. The table is
  * deleted during @After when the keyspace is dropped. Having the table managed requires having
  * the keyspace managed as well.
- *
  */
 public class CassandraRule extends ExternalResource {
 
@@ -72,7 +71,7 @@ public class CassandraRule extends ExternalResource {
 
   private CassandraRule(boolean manageKeyspace, boolean manageTable, String actualTableSchema) {
     this.manageKeyspace = manageKeyspace;
-    this.keyspaceName = "cqlunit_" + UUID.randomUUID().toString().replace("-", "");
+    this.keyspaceName = "cass" + UUID.randomUUID().toString().replace("-", "");
     this.manageTable = manageTable;
     this.tableSchema = actualTableSchema;
   }
@@ -85,24 +84,21 @@ public class CassandraRule extends ExternalResource {
     return keyspaceName;
   }
 
-  public ClusterConnection getClusterConnection() {
-    Cluster cluster = mock(Cluster.class);
+  public Cluster getCluster() {
+    final Cluster cluster = mock(Cluster.class);
     when(cluster.connect(anyString())).thenReturn(session);
-
-    ClusterConnection clusterConnection = mock(ClusterConnection.class);
-    when(clusterConnection.getCluster()).thenReturn(cluster);
-    return clusterConnection;
+    return cluster;
   }
 
   /**
-   * Note: Preferred usage is to connect via getClusterConnection
+   * Note: Preferred usage is to connect via {@link CassandraRule#getCluster()}
    */
   public int getNativeTransportPort() {
     return embeddedCassandra.get().getNativeTransportPort();
   }
 
   /**
-   * Note: Preferred usage is to connect via getClusterConnection
+   * Note: Preferred usage is to connect via {@link CassandraRule#getCluster()}
    */
   public int getThriftPort() {
     return embeddedCassandra.get().getThriftTransportPort();

@@ -16,6 +16,7 @@
 
 package com.spotify.cassandra.extra;
 
+import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.Row;
 import com.datastax.driver.core.Session;
 import com.datastax.driver.core.Statement;
@@ -23,12 +24,13 @@ import com.datastax.driver.core.querybuilder.Insert;
 import com.datastax.driver.core.querybuilder.QueryBuilder;
 import com.google.common.io.Resources;
 import org.junit.Rule;
+import org.junit.Test;
 
 import java.nio.ByteBuffer;
 
 import static org.junit.Assert.assertEquals;
 
-public class CassandraRuleTestManaged extends CassandraRuleTest {
+public class CassandraRuleTestManaged {
 
   @Rule
   public CassandraRule cassandraRule = CassandraRule.newBuilder()
@@ -36,15 +38,10 @@ public class CassandraRuleTestManaged extends CassandraRuleTest {
       .withManagedTable(Resources.getResource("cf.cql"))
       .build();
 
-  @Override
-  public CassandraRule getCassandraRule() {
-    return cassandraRule;
-  }
-
-  @Override
+  @Test
   public void queryRoundtrip() throws Exception {
-    ClusterConnection clusterConnection = getCassandraRule().getClusterConnection();
-    Session session = clusterConnection.getCluster().connect("mytable");
+    Cluster cluster = cassandraRule.getCluster();
+    Session session = cluster.connect("mytable");
 
     final String key = "mykey";
     final ByteBuffer value = ByteBuffer.wrap(new byte[] {1, 2});

@@ -21,12 +21,13 @@ import com.datastax.driver.core.Session;
 import com.datastax.driver.core.Statement;
 import com.datastax.driver.core.querybuilder.QueryBuilder;
 import org.junit.Rule;
+import org.junit.Test;
 
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 
-public class CassandraRuleTestUnmanaged extends CassandraRuleTest {
+public class CassandraRuleTestUnmanaged {
 
   String KEYSPACE_SCHEMA = "CREATE KEYSPACE unmanaged WITH replication = " +
       "{'class' : 'SimpleStrategy', 'replication_factor' : 1 }";
@@ -35,17 +36,11 @@ public class CassandraRuleTestUnmanaged extends CassandraRuleTest {
   String USE_STATEMENT = "USE unmanaged;";
 
   @Rule
-  public CassandraRule cassandra = CassandraRule.newBuilder().build();
+  public CassandraRule cassandraRule = CassandraRule.newBuilder().build();
 
-  @Override
-  public CassandraRule getCassandraRule() {
-    return cassandra;
-  }
-
-  @Override
+  @Test
   public void queryRoundtrip() throws Exception {
-
-    Session session = cassandra.getSession();
+    Session session = cassandraRule.getSession();
 
     session.execute(KEYSPACE_SCHEMA);
     session.execute(TABLE_SCHEMA);
