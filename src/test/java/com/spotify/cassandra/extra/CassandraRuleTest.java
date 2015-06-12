@@ -1,5 +1,7 @@
 package com.spotify.cassandra.extra;
 
+import com.google.common.base.Supplier;
+import com.google.common.base.Suppliers;
 import com.google.common.io.Resources;
 
 import com.datastax.driver.core.Row;
@@ -15,6 +17,8 @@ import java.nio.ByteBuffer;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 public class CassandraRuleTest {
 
@@ -70,6 +74,20 @@ public class CassandraRuleTest {
     session.execute("DROP KEYSPACE unmanaged;");
 
     rule.after();
+  }
+
+  @Test
+  public void delegatesToSupplier() {
+    final int nativePort = 5678;
+    final EmbeddedCassandra cassandra = mock(EmbeddedCassandra.class);
+    when(cassandra.getNativeTransportPort()).thenReturn(nativePort);
+
+    final Supplier<EmbeddedCassandra> supplier = Suppliers.ofInstance(cassandra);
+
+    final CassandraRule rule = new CassandraRule(supplier, false, false, null);
+    rule.getSession();
+
+    assertEquals(nativePort, rule.getNativeTransportPort());
   }
 
 }

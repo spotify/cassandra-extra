@@ -30,14 +30,9 @@ import org.junit.rules.ExternalResource;
 import java.io.IOException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
 import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import static org.mockito.Matchers.anyString;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 /**
  * Creates a 1-node Cassandra cluster for testing. Can be used as @Rule, or independently.
@@ -88,8 +83,6 @@ public class CassandraRule extends ExternalResource {
   }
 
   public Cluster getCluster() {
-    final Cluster cluster = mock(Cluster.class);
-    when(cluster.connect(anyString())).thenReturn(session);
     return cluster;
   }
 
@@ -105,10 +98,6 @@ public class CassandraRule extends ExternalResource {
    */
   public int getThriftPort() {
     return cassandraSupplier.get().getThriftTransportPort();
-  }
-
-  public Path getDataDir() {
-    return cassandraSupplier.get().getDataDir();
   }
 
   @Override
@@ -205,6 +194,7 @@ public class CassandraRule extends ExternalResource {
         throw new RuntimeException("Can't help with managing a table if the keyspace is not " +
             "managed as well");
       }
+
       Supplier<EmbeddedCassandra> cassandraSupplier = new EmbeddedCassandraSupplier();
       return new CassandraRule(cassandraSupplier, manageKeyspace, manageTable, actualTableSchema);
     }
