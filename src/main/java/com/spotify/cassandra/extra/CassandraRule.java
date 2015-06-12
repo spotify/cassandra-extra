@@ -16,12 +16,15 @@
 
 package com.spotify.cassandra.extra;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Supplier;
+import com.google.common.io.Closeables;
+import com.google.common.io.Resources;
+
 import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.Session;
 import com.datastax.driver.core.exceptions.DriverException;
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.io.Closeables;
-import com.google.common.io.Resources;
+
 import org.junit.rules.ExternalResource;
 
 import java.io.IOException;
@@ -29,7 +32,6 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -60,8 +62,7 @@ public class CassandraRule extends ExternalResource {
   public static final String USE_KEYSPACE_QUERY = "USE %s;";
   public static final String DROP_KEYSPACE_QUERY = "DROP KEYSPACE %s;";
 
-  private static AtomicReference<EmbeddedCassandra> embeddedCassandra = new AtomicReference<>();
-
+  private final Supplier<EmbeddedCassandra> cassandraSupplier;
   private final boolean manageKeyspace;
   private final boolean manageTable;
   private final String keyspaceName;
@@ -70,7 +71,9 @@ public class CassandraRule extends ExternalResource {
   private Cluster cluster;
   private Session session;
 
-  private CassandraRule(boolean manageKeyspace, boolean manageTable, String actualTableSchema) {
+  CassandraRule(Supplier<EmbeddedCassandra> cassandraSupplier, boolean manageKeyspace,
+                boolean manageTable, String actualTableSchema) {
+    this.cassandraSupplier = cassandraSupplier;
     this.manageKeyspace = manageKeyspace;
     this.keyspaceName = "cqlunit_" + UUID.randomUUID().toString().replace("-", "");
     this.manageTable = manageTable;
@@ -98,28 +101,27 @@ public class CassandraRule extends ExternalResource {
    * Note: Preferred usage is to connect via getClusterConnection
    */
   public int getNativeTransportPort() {
-    return embeddedCassandra.get().getNativeTransportPort();
+    return cassandraSupplier.get().getNativeTransportPort();
   }
 
   /**
    * Note: Preferred usage is to connect via getClusterConnection
    */
   public int getThriftPort() {
-    return embeddedCassandra.get().getThriftTransportPort();
+    return cassandraSupplier.get().getThriftTransportPort();
   }
 
   public Path getDataDir() {
-    return embeddedCassandra.get().getDataDir();
+    return cassandraSupplier.get().getDataDir();
   }
 
   @Override
   protected void before() throws Throwable {
     super.before();
-    ensureCassandraStarted();
 
     cluster = Cluster.builder()
-        .withPort(embeddedCassandra.get().getNativeTransportPort())
-        .addContactPoints(embeddedCassandra.get().getContactPoint())
+        .withPort(cassandraSupplier.get().getNativeTransportPort())
+        .addContactPoints(cassandraSupplier.get().getContactPoint())
         .build();
 
     session = cluster.connect();
@@ -133,13 +135,6 @@ public class CassandraRule extends ExternalResource {
 
     if (manageTable) {
       session.execute(tableSchema);
-    }
-  }
-
-  private void ensureCassandraStarted() throws IOException {
-    EmbeddedCassandra newEmbeddedCassandra = new EmbeddedCassandra();
-    if (embeddedCassandra.compareAndSet(null, newEmbeddedCassandra)) {
-      newEmbeddedCassandra.start();
     }
   }
 
@@ -214,7 +209,8 @@ public class CassandraRule extends ExternalResource {
         throw new RuntimeException("Can't help with managing a table if the keyspace is not " +
             "managed as well");
       }
-      return new CassandraRule(manageKeyspace, manageTable, actualTableSchema);
+      Supplier<EmbeddedCassandra> cassandraSupplier = new EmbeddedCassandraSupplier();
+      return new CassandraRule(cassandraSupplier, manageKeyspace, manageTable, actualTableSchema);
     }
 
   }
