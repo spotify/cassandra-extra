@@ -16,12 +16,15 @@
 
 package com.spotify.cassandra.extra;
 
-import com.datastax.driver.core.Session;
-import com.datastax.driver.core.exceptions.DriverException;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.Resources;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+
+import com.datastax.driver.core.Session;
+import com.datastax.driver.core.exceptions.DriverException;
+
 import org.apache.cassandra.service.CassandraDaemon;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,7 +46,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 
 /**
@@ -52,8 +54,7 @@ import static com.google.common.base.Preconditions.checkState;
 public class EmbeddedCassandra implements AutoCloseable {
 
   private static final Logger LOG = LoggerFactory.getLogger(EmbeddedCassandra.class);
-  private static final URL CONFIG_TEMPLATE =
-      EmbeddedCassandra.class.getClassLoader().getResource("embedded-cassandra-template.yaml");
+  private static final URL CONFIG_TEMPLATE = Resources.getResource("cassandra-template.yaml");
   private static final int CQL_RETRIES = 5;
 
   private final ExecutorService executorService = Executors.newSingleThreadScheduledExecutor(
@@ -63,60 +64,78 @@ public class EmbeddedCassandra implements AutoCloseable {
       .build()
   );
 
-  private final CassandraDaemon cassandra;
-
   private final Path dataDir;
-  private final int port;
+  private final int thriftPort;
   private final int storagePort;
   private final int nativeTransportPort;
+  private final CassandraDaemon cassandra;
   private final AtomicBoolean running = new AtomicBoolean(false);
 
-  public EmbeddedCassandra() throws IOException {
-    this.dataDir = Files.createTempDirectory("cassandra-embedded");
-    this.port = findFreePort();
-    this.storagePort = findFreePort();
-    this.nativeTransportPort = findFreePort();
-    LOG.info("Starting cassandra on port {}, nativeTransportPort {}, storagePort {}, in dir {}",
-             port, nativeTransportPort, storagePort, dataDir);
+  /**
+   * Create a new {@link com.spotify.cassandra.extra.EmbeddedCassandra} instance.
+   *
+   * This will allocate a temporary directory for data storage and pick random free ports.
+   * Note that you need to {@link com.spotify.cassandra.extra.EmbeddedCassandra#start} the created
+   * instance first before it becomes accessible.
+   * @return a new EmbeddedCassandra instance.
+   * @throws IOException if the instance can't be created.
+   */
+  public static EmbeddedCassandra create() throws IOException {
+    final Path dataDir = Files.createTempDirectory("cassandra-embedded");
+    final int thriftPort = findFreePort();
+    final int storagePort = findFreePort();
+    final int nativeTransportPort = findFreePort();
+    final CassandraDaemon cassandra = new CassandraDaemon();
+    return new EmbeddedCassandra(dataDir, thriftPort, storagePort, nativeTransportPort, cassandra);
+  }
 
-    checkNotNull(CONFIG_TEMPLATE, "Cassandra config template is null");
-    String baseFile = Resources.toString(CONFIG_TEMPLATE, Charset.defaultCharset());
+  @VisibleForTesting
+  EmbeddedCassandra(Path dataDir, int thriftPort, int storagePort, int nativeTransportPort,
+                    CassandraDaemon cassandra) {
+    this.dataDir = dataDir;
+    this.thriftPort = thriftPort;
+    this.storagePort = storagePort;
+    this.nativeTransportPort = nativeTransportPort;
+    this.cassandra = cassandra;
 
-    String newFile = baseFile.replace("$DIR$", dataDir.toFile().getPath());
-    newFile = newFile.replace("$PORT$", Integer.toString(port));
-    newFile = newFile.replace("$STORAGE_PORT$", Integer.toString(storagePort));
-    newFile = newFile.replace("$NATIVE_TRANSPORT_PORT$", Integer.toString(nativeTransportPort));
-
-    Path configFile = dataDir.resolve("cassandra.yaml");
-    Files.write(configFile, ImmutableSet.of(newFile), StandardCharsets.UTF_8);
-    LOG.info("Cassandra config file: " + configFile);
-
-    System.setProperty("cassandra.config", "file:" + configFile.toString());
-    System.setProperty("cassandra-foreground", "true");
-
-    cassandra = new CassandraDaemon();
-    LOG.info("Embedded cassandra set up");
+    LOG.info("Create new instance. Ports (thrift: {}, nativeTransport: {}, storage: {}), Data {}",
+             thriftPort, nativeTransportPort, storagePort, dataDir);
   }
 
   /**
    * Starts the embedded cassandra instance.
+   *
    * @throws EmbeddedCassandraException if cassandra can't start up
    */
-  public void start() {
+  public void start() throws IOException {
     if (running.compareAndSet(false, true)) {
-      LOG.info("Starting Embedded Cassandra");
-      Future<Void> startupFuture = executorService.submit(new Callable<Void>() {
-        @Override
-        public Void call() throws Exception {
-          cassandra.activate();
-          LOG.info("Embedded Cassandra started");
-          return null;
-        }
-      });
-
       try {
+        LOG.info("Creating Embedded Cassandra config file");
+        String baseFile = Resources.toString(CONFIG_TEMPLATE, Charset.defaultCharset());
+        String newFile = baseFile.replace("$DIR$", dataDir.toFile().getPath());
+        newFile = newFile.replace("$PORT$", Integer.toString(thriftPort));
+        newFile = newFile.replace("$STORAGE_PORT$", Integer.toString(storagePort));
+        newFile = newFile.replace("$NATIVE_TRANSPORT_PORT$", Integer.toString(nativeTransportPort));
+
+        Path configFile = dataDir.resolve("cassandra.yaml");
+        Files.write(configFile, ImmutableSet.of(newFile), StandardCharsets.UTF_8);
+        LOG.info("Cassandra config file: " + configFile);
+
+        System.setProperty("cassandra.config", "file:" + configFile.toString());
+        System.setProperty("cassandra-foreground", "true");
+
+        LOG.info("Starting Embedded Cassandra");
+        Future<Void> startupFuture = executorService.submit(new Callable<Void>() {
+          @Override
+          public Void call() throws Exception {
+            cassandra.activate();
+            LOG.info("Embedded Cassandra started");
+            return null;
+          }
+        });
+
         startupFuture.get();
-      } catch (InterruptedException | ExecutionException e) {
+      } catch (InterruptedException | ExecutionException | IOException e) {
         throw new EmbeddedCassandraException("Can't start up cassandra", e);
       }
     }
@@ -157,7 +176,7 @@ public class EmbeddedCassandra implements AutoCloseable {
    * Get the thrift port.
    */
   public int getThriftTransportPort() {
-    return port;
+    return thriftPort;
   }
 
   /**
@@ -165,13 +184,6 @@ public class EmbeddedCassandra implements AutoCloseable {
    */
   public String getContactPoint() {
     return "127.0.0.1";
-  }
-
-  /**
-   * Get the data directory.
-   */
-  public Path getDataDir() {
-    return dataDir;
   }
 
   /**

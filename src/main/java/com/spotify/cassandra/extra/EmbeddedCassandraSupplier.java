@@ -25,7 +25,7 @@ class EmbeddedCassandraSupplier implements Supplier<EmbeddedCassandra> {
     }
 
     try {
-      instance = new EmbeddedCassandra();
+      instance = EmbeddedCassandra.create();
       if (CASSANDRA.compareAndSet(null, instance)) {
         instance.start();
         return instance;
