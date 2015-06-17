@@ -70,6 +70,7 @@ public class EmbeddedCassandra implements AutoCloseable {
   private final int nativeTransportPort;
   private final CassandraDaemon cassandra;
   private final AtomicBoolean running = new AtomicBoolean(false);
+  private String partitioner = "org.apache.cassandra.dht.RandomPartitioner";
 
   /**
    * Create a new {@link com.spotify.cassandra.extra.EmbeddedCassandra} instance.
@@ -116,6 +117,7 @@ public class EmbeddedCassandra implements AutoCloseable {
         newFile = newFile.replace("$PORT$", Integer.toString(thriftPort));
         newFile = newFile.replace("$STORAGE_PORT$", Integer.toString(storagePort));
         newFile = newFile.replace("$NATIVE_TRANSPORT_PORT$", Integer.toString(nativeTransportPort));
+        newFile = newFile.replace("$PARTITIONER$", partitioner);
 
         Path configFile = dataDir.resolve("cassandra.yaml");
         Files.write(configFile, ImmutableSet.of(newFile), StandardCharsets.UTF_8);
@@ -163,6 +165,13 @@ public class EmbeddedCassandra implements AutoCloseable {
         }
       }
     }
+  }
+
+  /**
+   * Set the partitioner kind to use.
+   */
+  public void setPartitioner(String partitioner) {
+    this.partitioner = partitioner;
   }
 
   /**
