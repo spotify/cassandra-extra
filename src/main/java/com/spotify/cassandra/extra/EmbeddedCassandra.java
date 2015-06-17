@@ -187,6 +187,13 @@ public class EmbeddedCassandra implements AutoCloseable {
   }
 
   /**
+   * Get the data directory.
+   */
+  public String getDataDir() {
+    return dataDir.toAbsolutePath().toString();
+  }
+
+  /**
    * Stops the embedded cassandra instance.
    */
   public void stop() {
