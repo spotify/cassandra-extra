@@ -5,7 +5,7 @@
 
     <groupId>com.spotify</groupId>
     <artifactId>cassandra-extra</artifactId>
-    <packaging>pom</packaging>
+    <packaging>jar</packaging>
     <version>0.0.1-SNAPSHOT</version>
     <name>cassandra-extra</name>
     <description>Set of tools enhancing testing experience with Apache Cassandra</description>
