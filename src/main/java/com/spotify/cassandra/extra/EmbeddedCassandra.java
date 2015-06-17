@@ -29,6 +29,7 @@ import org.apache.cassandra.service.CassandraDaemon;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.URL;
@@ -37,6 +38,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.concurrent.Callable;
@@ -71,6 +73,7 @@ public class EmbeddedCassandra implements AutoCloseable {
   private final CassandraDaemon cassandra;
   private final AtomicBoolean running = new AtomicBoolean(false);
   private String partitioner = "org.apache.cassandra.dht.RandomPartitioner";
+  private JmxProxy jmxProxy = null;
 
   /**
    * Create a new {@link com.spotify.cassandra.extra.EmbeddedCassandra} instance.
@@ -165,6 +168,45 @@ public class EmbeddedCassandra implements AutoCloseable {
         }
       }
     }
+  }
+
+  /**
+   * Establishes a JMX connection to the running EmbeddedCassandra instance.
+   */
+  public void connectJmx() throws JmxProxyException {
+    jmxProxy = JmxProxy.connectLocal();
+  }
+
+  /**
+   * Loads SSTables present in srcDirPath into the currently running EmbeddedCassandra instance.
+   * @param srcDirPath directory where the input SSTables can be found.
+   * @param keyspace name of the keyspace to load the SSTables into.
+   * @param table name of the table to leoad the SSTables into.
+   * @throws IOException
+   */
+  public void loadSSTables(String srcDirPath, String keyspace, String table) throws IOException {
+    String dstDirPath = String.format("%s/data/%s/%s", getDataDir(), keyspace, table);
+    File dstDir = new File(dstDirPath);
+    if (!dstDir.exists()) {
+      throw new EmbeddedCassandraException("Target keyspace/table doesn't exist");
+    }
+
+    File srcDir = new File(srcDirPath);
+    for (String file : srcDir.list()) {
+      Files.copy(
+          Paths.get(String.format("%s/%s", srcDirPath, file)),
+          Paths.get(String.format("%s/%s", dstDirPath, file))
+      );
+    }
+    if (jmxProxy == null) {
+      LOG.info("JmxProxy is not connected, connecting now");
+      try {
+        connectJmx();
+      } catch (JmxProxyException e) {
+        throw new EmbeddedCassandraException("Establishing JMX connection failed", e);
+      }
+    }
+    jmxProxy.loadSStables(keyspace, table);
   }
 
   /**

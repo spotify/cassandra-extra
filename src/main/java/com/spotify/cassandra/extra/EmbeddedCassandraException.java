@@ -22,4 +22,8 @@ public class EmbeddedCassandraException extends RuntimeException {
     super(msg, cause);
   }
 
+  public EmbeddedCassandraException(String msg) {
+    super(msg);
+  }
+
 }
